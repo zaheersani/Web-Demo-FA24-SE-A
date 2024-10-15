@@ -1,8 +1,6 @@
 const express = require('express')
 const userRouter = express.Router()
 
-userRouter.use(express.json())
-
 const users = require('./users.json')
 
 userRouter.get('/', (req, res) => {

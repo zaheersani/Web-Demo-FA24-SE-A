@@ -1,52 +1,79 @@
 const express = require('express')
 const app = express()
-// const users = require('./users')
-
 const users = require('./users.json')
 
+// Builtin Middleware
+app.use(express.json())
+
+// Custom Middleware
+const middleware1 = (req, res, next) => {
+    console.log('Middleware 1')
+    console.log(`${req.method} ${req.path}`)
+    req.info = "Some info"
+    // req.method = "POST"
+    next()
+    // res.send('I am not happy with your request!')
+}
+
+// Custom Middleware
+const middleware2 = (req, res, next) => {
+    console.log('Middleware 2')
+    console.log(`${req.method} ${req.path}`)
+    console.log(req.info)
+    next()
+}
+
+// Global Middlewares
+app.use(middleware1)
+app.use(middleware2)
+app.use((req, res, next) => {
+    console.log('Middleware 3')
+    next()
+})
+
+// Custom Authentication Middleware
+const auth = (req, res, next) => {
+    const { username, password } = req.body
+    console.log('Auth Middleware')
+    if(username === 'admin' && password === 'admin') {
+        next()
+    } else {
+        res.send('Unauthorized')
+    }
+};
+
+// GET / - Middleware 1 - Auth - Middleware 2
+app.get('/', middleware1, auth, middleware2, (req, res) => {
+    res.send(`Welcome ${req.body.username}`)
+})
+
+app.post('/', (req, res) => {
+    res.send(`Hello World from ${req.method}`)
+})
+
+// Crash the server
+app.get('/comments', (req, res) => {
+    // Code will crash here and sends to Error middleware
+    comments.push(req.body)
+    res.send('Comments')
+})
+
+// Users Router
 const userRouter = require('./userRouter');
 app.use('/users', userRouter);
 
-
-
-app.use(express.json())
-
-app.get('/', (req, res) => {
-    // res.send('This is Root route')
-    const json = '{ "name": "John Doe", "age": 25 }';
-    const jsObj = {
-        name: 'John Doe',
-        age: 25
-    }
-    // if(json) res.status(200).send(json)
-    // else {
-    // }
-    res.redirect('/about/4')
-    res.end()
-    // res.send(jsObj)
+// When no route is matched
+app.use((req, res) => {
+    res.status(404).send('404 Not Found')
 })
 
-// const users=[{ name: 'Old User', age: 92, department: 'Software Engineering' }]
-
-// app.post('/users', (req, res) => {
-//     const userObj = req.body
-//     users.push(req.body)
-//     console.log(users)
-//     res.send(userObj)
-// })
-
-app.get('/about/:id', (req, res) => {
-    res.send('This is About route')
+// Error Middleware
+app.use((err, req, res, next) => {
+    console.error(err.stack)
+    res.status(500).send('Something broke!')
 })
 
-// app.get('/users', (req, res) => {
-//     res.send(users)
-// })
-
-// app.get('/users/:id', (req, res) => {
-//     res.send(`This is User ${req.params.id} route`)
-// })
-
+// Listen on port 3000
 app.listen(3000, () => {
     console.log(`Listening on port: 3000`)
 })
