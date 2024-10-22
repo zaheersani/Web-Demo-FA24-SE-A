@@ -1,3 +1,4 @@
+const jwt = require('jsonwebtoken')
 const express = require('express')
 const app = express()
 const users = require('./users.json')
@@ -5,51 +6,37 @@ const users = require('./users.json')
 // Builtin Middleware
 app.use(express.json())
 
-// Custom Middleware
-const middleware1 = (req, res, next) => {
-    console.log('Middleware 1')
-    console.log(`${req.method} ${req.path}`)
-    req.info = "Some info"
-    // req.method = "POST"
-    next()
-    // res.send('I am not happy with your request!')
-}
-
-// Custom Middleware
-const middleware2 = (req, res, next) => {
-    console.log('Middleware 2')
-    console.log(`${req.method} ${req.path}`)
-    console.log(req.info)
-    next()
-}
-
-// Global Middlewares
-app.use(middleware1)
-app.use(middleware2)
-app.use((req, res, next) => {
-    console.log('Middleware 3')
-    next()
-})
-
-// Custom Authentication Middleware
-const auth = (req, res, next) => {
-    const { username, password } = req.body
-    console.log('Auth Middleware')
-    if(username === 'admin' && password === 'admin') {
-        next()
+// Login Route to Sign JWT
+app.post('/login', (req, res) => {
+    if(req.body.username === 'admin' && req.body.password === 'admin') {
+      const token = jwt.sign({ usernmae: 'admin', department: 'Software Engineering' },
+        'secret', 
+        { expiresIn: '1h' }
+      )
+      res.send({ token });
     } else {
-        res.send('Unauthorized')
+      res.status(401).send('Unauthorized');
     }
-};
-
-// GET / - Middleware 1 - Auth - Middleware 2
-app.get('/', middleware1, auth, middleware2, (req, res) => {
-    res.send(`Welcome ${req.body.username}`)
-})
-
-app.post('/', (req, res) => {
-    res.send(`Hello World from ${req.method}`)
-})
+  });
+  
+  // Authentication Middleware
+  const auth = (req, res, next) => {
+    console.log(req.headers)
+    const token = req.headers.authorization.split(' ')[1];
+    jwt.verify(token, 'secret', (err, user) => {
+      if(err) {
+        res.status(403).send('Forbidden');
+      } else {
+        req.auth = user;
+        next();
+      }
+    });
+  }
+  
+  // Protected Route which uses Authentication Middleware
+  app.post('/protected', auth, (req, res) => {
+    res.send({ auth: req.auth });
+  });
 
 // Crash the server
 app.get('/comments', (req, res) => {
