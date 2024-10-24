@@ -1,66 +1,91 @@
-const jwt = require('jsonwebtoken')
-const express = require('express')
-const app = express()
-const users = require('./users.json')
+const express = require('express');
+const mongoose = require('mongoose');
+const app = express();
 
-// Builtin Middleware
-app.use(express.json())
+app.use(express.json());
 
-// Login Route to Sign JWT
-app.post('/login', (req, res) => {
-    if(req.body.username === 'admin' && req.body.password === 'admin') {
-      const token = jwt.sign({ usernmae: 'admin', department: 'Software Engineering' },
-        'secret', 
-        { expiresIn: '1h' }
-      )
-      res.send({ token });
-    } else {
-      res.status(401).send('Unauthorized');
+// Define MongoDB schema
+const userSchema = new mongoose.Schema({
+    name: {
+        type: String,
+        required: true
+    },
+    email: {
+        type: String,
+        required: true,
+        unique: true
+    },
+    age: {
+        type: Number,
+        required: true
     }
-  });
-  
-  // Authentication Middleware
-  const auth = (req, res, next) => {
-    console.log(req.headers)
-    const token = req.headers.authorization.split(' ')[1];
-    jwt.verify(token, 'secret', (err, user) => {
-      if(err) {
-        res.status(403).send('Forbidden');
-      } else {
-        req.auth = user;
-        next();
-      }
-    });
+});
+
+// Define MongoDB model
+const User = mongoose.model('User', userSchema);
+// Export the model when defined in a separate file
+// module.exports = User;
+
+// Create a new user
+app.post('/users', async (req, res) => {
+  try {
+      const user = new User(req.body);
+      await user.save();
+      res.status(201).send(user);
+  } catch (error) {
+      res.status(400).send(error);
   }
-  
-  // Protected Route which uses Authentication Middleware
-  app.post('/protected', auth, (req, res) => {
-    res.send({ auth: req.auth });
-  });
+});
 
-// Crash the server
-app.get('/comments', (req, res) => {
-    // Code will crash here and sends to Error middleware
-    comments.push(req.body)
-    res.send('Comments')
-})
+// Get all users
+app.get('/users', async (req, res) => {
+  try {
+      const users = await User.find();
+      res.status(200).send(users);
+  } catch (error) {
+      res.status(500).send(error);
+  }
+});
 
-// Users Router
-const userRouter = require('./userRouter');
-app.use('/users', userRouter);
+// Get a user by ID
+app.get('/users/:id', async (req, res) => {
+  try {
+      const user = await User.findById(req.params.id);
+      if (!user) return res.status(404).send({ message: 'User not found' });
+      res.status(200).send(user);
+  } catch (error) {
+      res.status(500).send(error);
+  }
+});
 
-// When no route is matched
-app.use((req, res) => {
-    res.status(404).send('404 Not Found')
-})
+// Update a user by ID
+app.put('/users/:id', async (req, res) => {
+  try {
+      const user = await User.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true });
+      if (!user) return res.status(404).send({ message: 'User not found' });
+      res.status(200).send(user);
+  } catch (error) {
+      res.status(400).send(error);
+  }
+});
 
-// Error Middleware
-app.use((err, req, res, next) => {
-    console.error(err.stack)
-    res.status(500).send('Something broke!')
-})
+// Delete a user by ID
+app.delete('/users/:id', async (req, res) => {
+  try {
+      const user = await User.findByIdAndDelete(req.params.id);
+      if (!user) return res.status(404).send({ message: 'User not found' });
+      res.status(200).send({ message: 'User deleted successfully' });
+  } catch (error) {
+      res.status(500).send(error);
+  }
+});
 
-// Listen on port 3000
+// Connect to MongoDB
+const connectionString = 'mongodb://localhost:27017/mongo-express';
+mongoose.connect(connectionString, { useNewUrlParser: true, useUnifiedTopology: true })
+    .then(() => console.log("Connected to MongoDB"))
+    .catch(err => console.error("Could not connect to MongoDB", err));
+
 app.listen(3000, () => {
-    console.log(`Listening on port: 3000`)
-})
+  console.log('Server is running on port 3000');
+});
